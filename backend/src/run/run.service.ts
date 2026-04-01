@@ -16,6 +16,11 @@ interface UploadedWasmFile {
   buffer?: Buffer;
 }
 
+interface TemporaryWasmArtifact {
+  directoryPath: string;
+  wasmPath: string;
+}
+
 interface RunFunctionParams {
   wasmFile?: UploadedWasmFile;
   inputJson: string;
@@ -120,8 +125,8 @@ export class RunService {
     }
 
     const exportToRun = exportName?.trim() || 'run';
-    const temporaryWasmPath = await this.writeTemporaryWasmFile(wasmFile);
-    const wasmPath = temporaryWasmPath ?? functionInfo.wasmPath;
+    const temporaryWasmArtifact = await this.writeTemporaryWasmFile(wasmFile);
+    const wasmPath = temporaryWasmArtifact?.wasmPath ?? functionInfo.wasmPath;
 
     try {
       const result = await this.shopifyFunctionRunner.runFunction(
@@ -143,8 +148,13 @@ export class RunService {
 
       return result.result?.output ?? {};
     } finally {
-      if (temporaryWasmPath) {
-        await fs.unlink(temporaryWasmPath).catch(() => undefined);
+      if (temporaryWasmArtifact) {
+        await fs
+          .rm(temporaryWasmArtifact.directoryPath, {
+            force: true,
+            recursive: true,
+          })
+          .catch(() => undefined);
       }
     }
   }
@@ -271,7 +281,7 @@ export class RunService {
 
   private async writeTemporaryWasmFile(
     wasmFile?: UploadedWasmFile,
-  ): Promise<string | null> {
+  ): Promise<TemporaryWasmArtifact | null> {
     if (!wasmFile?.buffer?.length) {
       return null;
     }
@@ -284,7 +294,10 @@ export class RunService {
 
     await fs.writeFile(temporaryWasmPath, wasmFile.buffer);
 
-    return temporaryWasmPath;
+    return {
+      directoryPath: temporaryDirectory,
+      wasmPath: temporaryWasmPath,
+    };
   }
 
   private normalizeFunctionType(functionType?: string): SupportedFunctionType {

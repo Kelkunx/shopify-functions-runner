@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 import { RunService } from './run.service';
 import { ShopifyFunctionRunnerService } from './shopify-function-runner.service';
 
@@ -8,6 +9,7 @@ describe('RunService', () => {
   let service: RunService;
 
   beforeEach(() => {
+    jest.restoreAllMocks();
     getFunctionInfoMock = jest.fn();
     runFunctionMock = jest.fn();
 
@@ -147,6 +149,59 @@ describe('RunService', () => {
       '/tmp/function.wasm',
       '/tmp/input.graphql',
       '/tmp/schema.graphql',
+    );
+  });
+
+  it('cleans up temporary wasm directories after real runner execution', async () => {
+    jest.spyOn(fs, 'mkdtemp').mockResolvedValue('/tmp/uploaded-function-dir');
+    jest.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
+    const removeDirectorySpy = jest
+      .spyOn(fs, 'rm')
+      .mockResolvedValue(undefined);
+
+    getFunctionInfoMock.mockResolvedValue({
+      functionRunnerPath: '/tmp/function-runner',
+      schemaPath: '/tmp/schema.graphql',
+      targeting: {
+        'purchase.product-discount.run': {
+          inputQueryPath: '/tmp/input.graphql',
+        },
+      },
+      wasmPath: '/tmp/function.wasm',
+    });
+
+    runFunctionMock.mockResolvedValue({
+      error: null,
+      result: {
+        output: {
+          discounts: [],
+        },
+      },
+    });
+
+    await service.runFunction({
+      functionDir: __dirname,
+      inputJson: JSON.stringify({ cart: { lines: [] } }),
+      target: 'purchase.product-discount.run',
+      wasmFile: {
+        buffer: Buffer.from('wasm'),
+        originalname: 'uploaded.wasm',
+      },
+    });
+
+    expect(runFunctionMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      '/tmp/function-runner',
+      '/tmp/uploaded-function-dir/uploaded.wasm',
+      '/tmp/input.graphql',
+      '/tmp/schema.graphql',
+    );
+    expect(removeDirectorySpy).toHaveBeenCalledWith(
+      '/tmp/uploaded-function-dir',
+      {
+        force: true,
+        recursive: true,
+      },
     );
   });
 });

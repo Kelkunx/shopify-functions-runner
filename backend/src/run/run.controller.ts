@@ -30,8 +30,8 @@ export class RunController {
   ): Promise<RunResponse> {
     return this.runService.runFunction({
       wasmFile,
-      inputJson: body.inputJson ?? '',
-      functionType: body.functionType ?? '',
+      inputJson: body.inputJson,
+      functionType: body.functionType,
       functionDir: body.functionDir,
       target: body.target,
       exportName: body.exportName,

@@ -1,27 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   formatTemplateInput,
   getTemplatesForType,
   type FunctionType,
 } from "@/lib/function-templates";
-import {
-  loadSavedFixtures,
-  persistSavedFixtures,
-  type SavedFixture,
-  type RunnerMode,
-} from "@/lib/saved-fixtures";
-import type { RunResponse } from "./runner-workspace.types";
+import { type SavedFixture, type RunnerMode } from "@/lib/saved-fixtures";
 import {
   formatJsonString,
-  formatOutputJson,
   getJsonValidationError,
   initialFunctionInputJson,
   initialFunctionTemplate,
   initialRunnerFunctionType,
-  runnerApiBaseUrl,
 } from "./runner-workspace.helpers";
+import { useRunOutputState } from "./runner/hooks/use-run-output-state";
+import { useRunnerExecution } from "./runner/hooks/use-runner-execution";
+import { useSavedFixturesStore } from "./runner/hooks/use-saved-fixtures-store";
 
 export function useRunnerWorkspaceController() {
   const [activeRunnerMode, setActiveRunnerMode] = useState<RunnerMode>("mock");
@@ -38,23 +33,10 @@ export function useRunnerWorkspaceController() {
   const [currentTarget, setCurrentTarget] = useState("");
   const [currentExportName, setCurrentExportName] = useState("run");
   const [currentFixtureName, setCurrentFixtureName] = useState("");
-  const [allSavedFixtures, setAllSavedFixtures] = useState<SavedFixture[]>([]);
-  const [runResponse, setRunResponse] = useState<RunResponse | null>(null);
-  const [runRequestError, setRunRequestError] = useState("");
-  const [outputCopyFeedback, setOutputCopyFeedback] = useState("");
-  const [isRunInFlight, setIsRunInFlight] = useState(false);
-  const [isOutputModalOpen, setIsOutputModalOpen] = useState(false);
 
   const availableTemplates = useMemo(
     () => getTemplatesForType(currentFunctionType),
     [currentFunctionType],
-  );
-  const visibleSavedFixtures = useMemo(
-    () =>
-      allSavedFixtures.filter(
-        (savedFixture) => savedFixture.runnerMode === activeRunnerMode,
-      ),
-    [activeRunnerMode, allSavedFixtures],
   );
   const jsonValidationError = useMemo(
     () => getJsonValidationError(currentInputJson),
@@ -67,76 +49,33 @@ export function useRunnerWorkspaceController() {
     [selectedTemplateId, availableTemplates],
   );
 
-  useEffect(() => {
-    setAllSavedFixtures(loadSavedFixtures());
-  }, []);
-
-  useEffect(() => {
-    if (
-      availableTemplates.some((template) => template.id === selectedTemplateId)
-    ) {
-      return;
-    }
-
-    setSelectedTemplateId(availableTemplates[0]?.id ?? "");
-  }, [selectedTemplateId, availableTemplates]);
-
-  async function runFunction() {
-    setIsRunInFlight(true);
-    setRunRequestError("");
-
-    if (jsonValidationError) {
-      setIsRunInFlight(false);
-      setRunResponse(null);
-      setRunRequestError(`Input JSON is invalid: ${jsonValidationError}`);
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("inputJson", currentInputJson);
-    formData.append("functionType", currentFunctionType);
-
-    if (currentWasmFile) {
-      formData.append("wasm", currentWasmFile);
-    }
-
-    if (activeRunnerMode === "shopify") {
-      if (currentFunctionDir.trim()) {
-        formData.append("functionDir", currentFunctionDir.trim());
-      }
-
-      if (currentTarget.trim()) {
-        formData.append("target", currentTarget.trim());
-      }
-
-      if (currentExportName.trim()) {
-        formData.append("exportName", currentExportName.trim());
-      }
-    }
-
-    try {
-      const runHttpResponse = await fetch(`${runnerApiBaseUrl}/run`, {
-        body: formData,
-        method: "POST",
-      });
-      const runPayload = (await runHttpResponse.json()) as RunResponse;
-
-      if (!runHttpResponse.ok) {
-        throw new Error(
-          runPayload.errors?.join(" ") || "Runner request failed.",
-        );
-      }
-
-      setRunResponse(runPayload);
-    } catch (error) {
-      setRunResponse(null);
-      setRunRequestError(
-        error instanceof Error ? error.message : "Unable to reach the backend.",
-      );
-    } finally {
-      setIsRunInFlight(false);
-    }
-  }
+  const {
+    deleteSavedFixture: removeSavedFixture,
+    saveSavedFixture,
+    visibleSavedFixtures,
+  } = useSavedFixturesStore(activeRunnerMode);
+  const {
+    isRunInFlight,
+    runFunction,
+    runRequestError,
+    runResponse,
+    setRunRequestError,
+  } = useRunnerExecution({
+    currentExportName,
+    currentFunctionDir,
+    currentFunctionType,
+    currentInputJson,
+    currentTarget,
+    currentWasmFile,
+    jsonValidationError,
+    runnerMode: activeRunnerMode,
+  });
+  const {
+    copyRunOutput,
+    isOutputModalOpen,
+    outputCopyFeedback,
+    setIsOutputModalOpen,
+  } = useRunOutputState(runResponse);
 
   function updateRunnerMode(nextRunnerMode: RunnerMode) {
     setActiveRunnerMode(nextRunnerMode);
@@ -192,10 +131,8 @@ export function useRunnerWorkspaceController() {
       runnerMode: activeRunnerMode,
       target: currentTarget,
     };
-    const nextSavedFixtures = [savedFixture, ...allSavedFixtures];
 
-    setAllSavedFixtures(nextSavedFixtures);
-    persistSavedFixtures(nextSavedFixtures);
+    saveSavedFixture(savedFixture);
     setCurrentFixtureName("");
     setRunRequestError("");
   }
@@ -215,27 +152,7 @@ export function useRunnerWorkspaceController() {
   }
 
   function deleteSavedFixture(savedFixtureId: string) {
-    const nextSavedFixtures = allSavedFixtures.filter(
-      (savedFixture) => savedFixture.id !== savedFixtureId,
-    );
-
-    setAllSavedFixtures(nextSavedFixtures);
-    persistSavedFixtures(nextSavedFixtures);
-  }
-
-  async function copyRunOutput() {
-    if (!runResponse) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(formatOutputJson(runResponse.output));
-      setOutputCopyFeedback("Copied");
-      window.setTimeout(() => setOutputCopyFeedback(""), 1400);
-    } catch {
-      setOutputCopyFeedback("Copy failed");
-      window.setTimeout(() => setOutputCopyFeedback(""), 1800);
-    }
+    removeSavedFixture(savedFixtureId);
   }
 
   return {

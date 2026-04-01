@@ -1,6 +1,6 @@
-# Shopify Functions Local Runner
+# Shopify Functions Workbench
 
-Local developer tool for testing Shopify Functions `.wasm` files without deploying to Shopify.
+Open-source developer tool for testing Shopify Functions `.wasm` files locally without deploying to Shopify.
 
 The project is organized as a simple monorepo:
 
@@ -9,7 +9,7 @@ The project is organized as a simple monorepo:
 
 ## Goal
 
-The runner is designed to shorten the Shopify Functions feedback loop:
+The workbench is designed to shorten the Shopify Functions feedback loop:
 
 - upload a `.wasm` file
 - paste or edit JSON input locally
@@ -51,7 +51,7 @@ Current limitation:
 ## Project Structure
 
 ```text
-shopify-functions-runner/
+Shopify-Functions-Workbench/
 ├── backend/
 │   ├── src/
 │   └── test/

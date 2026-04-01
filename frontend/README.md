@@ -1,10 +1,10 @@
 # Frontend
 
-Next.js interface for the Shopify Functions Local Runner.
+Next.js interface for Shopify Functions Workbench.
 
 ## Purpose
 
-The frontend provides a single-page developer tool to:
+The frontend provides the workbench UI to:
 
 - choose a Shopify function type
 - load a JSON input template

@@ -15,8 +15,9 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Shopify Functions Local Runner",
-  description: "Run Shopify Function WebAssembly modules locally with JSON input.",
+  title: "Shopify Functions Workbench",
+  description:
+    "Open-source developer tool to run Shopify Function WebAssembly modules locally.",
 };
 
 export default function RootLayout({

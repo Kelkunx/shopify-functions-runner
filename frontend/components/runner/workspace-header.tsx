@@ -25,10 +25,10 @@ export function WorkspaceHeader({
       <div className="flex min-h-14 items-center justify-between gap-4 px-5 lg:px-8">
         <div className="flex min-w-0 items-center gap-4">
           <div className="min-w-0">
-            <h1 className="text-[15px] font-semibold">Shopify Functions Local Runner</h1>
+            <h1 className="text-[15px] font-semibold">Shopify Functions Workbench</h1>
             <p className="text-sm text-muted">
-              Local JSON runner for `.wasm` payload tests and Shopify function-debug
-              sessions.
+              Open-source workbench for local Shopify Function runs, fixtures, and
+              debugging.
             </p>
           </div>
           <div className="hidden h-6 w-px bg-border lg:block" />

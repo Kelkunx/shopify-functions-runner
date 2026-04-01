@@ -1,6 +1,6 @@
 # Backend
 
-NestJS API for the Shopify Functions Local Runner.
+NestJS API for Shopify Functions Workbench.
 
 ## Purpose
 

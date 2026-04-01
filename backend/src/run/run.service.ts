@@ -3,36 +3,22 @@ import { promises as fs } from 'node:fs';
 import type { Stats } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {
-  SUPPORTED_FUNCTION_TYPES,
-  type SupportedFunctionType,
-} from './dto/run-request.dto';
+import { type SupportedFunctionType } from './dto/run-request.dto';
+import { RunRequestParserService } from './run-request-parser.service';
 import { ShopifyFunctionRunnerService } from './shopify-function-runner.service';
+import { type RunFunctionParams } from './types/run-function-params.type';
 import { type RunResponse } from './types/run-response.type';
-
-interface UploadedWasmFile {
-  originalname?: string;
-  size?: number;
-  buffer?: Buffer;
-}
+import { type UploadedWasmFile } from './types/uploaded-wasm-file.type';
 
 interface TemporaryWasmArtifact {
   directoryPath: string;
   wasmPath: string;
 }
 
-interface RunFunctionParams {
-  wasmFile?: UploadedWasmFile;
-  inputJson: string;
-  functionType?: string;
-  functionDir?: string;
-  target?: string;
-  exportName?: string;
-}
-
 @Injectable()
 export class RunService {
   constructor(
+    private readonly runRequestParser: RunRequestParserService,
     private readonly shopifyFunctionRunner: ShopifyFunctionRunnerService,
   ) {}
 
@@ -45,49 +31,33 @@ export class RunService {
     exportName,
   }: RunFunctionParams): Promise<RunResponse> {
     const startTime = process.hrtime.bigint();
-    const errors: string[] = [];
-    const hasRealRunnerConfig = Boolean(functionDir?.trim() && target?.trim());
-    const normalizedFunctionType = this.normalizeFunctionType(functionType);
+    const { errors, parsedRequest } = this.runRequestParser.parse({
+      exportName,
+      functionDir,
+      functionType,
+      inputJson,
+      target,
+      wasmFile,
+    });
 
-    if (wasmFile?.originalname && !wasmFile.originalname.endsWith('.wasm')) {
-      errors.push('The uploaded file must have a .wasm extension.');
-    }
-
-    if (
-      (functionDir?.trim() && !target?.trim()) ||
-      (!functionDir?.trim() && target?.trim())
-    ) {
-      errors.push(
-        'Both functionDir and target are required to use the real Shopify runner.',
-      );
-    }
-
-    let parsedInput: Record<string, unknown> | null = null;
-
-    try {
-      parsedInput = JSON.parse(inputJson) as Record<string, unknown>;
-    } catch {
-      errors.push('Input JSON is invalid.');
-    }
-
-    if (errors.length > 0) {
+    if (errors.length > 0 || !parsedRequest) {
       return this.buildResponse(false, {}, startTime, errors);
     }
 
     try {
-      const output = hasRealRunnerConfig
+      const output = parsedRequest.hasRealRunnerConfig
         ? await this.executeShopifyRunner({
-            exportName,
-            functionDir: functionDir!.trim(),
-            parsedInput: parsedInput ?? {},
-            target: target!.trim(),
-            wasmFile,
+            exportName: parsedRequest.trimmedExportName,
+            functionDir: parsedRequest.trimmedFunctionDir!,
+            parsedInput: parsedRequest.parsedInput,
+            target: parsedRequest.trimmedTarget!,
+            wasmFile: parsedRequest.wasmFile,
           })
         : this.executeMockRunner({
-            functionType: normalizedFunctionType,
-            requestedFunctionType: functionType?.trim(),
-            parsedInput: parsedInput ?? {},
-            wasmFile,
+            functionType: parsedRequest.normalizedFunctionType,
+            requestedFunctionType: parsedRequest.requestedFunctionType,
+            parsedInput: parsedRequest.parsedInput,
+            wasmFile: parsedRequest.wasmFile,
           });
 
       return this.buildResponse(true, output, startTime, []);
@@ -298,18 +268,5 @@ export class RunService {
       directoryPath: temporaryDirectory,
       wasmPath: temporaryWasmPath,
     };
-  }
-
-  private normalizeFunctionType(functionType?: string): SupportedFunctionType {
-    const trimmed = functionType?.trim();
-
-    if (
-      trimmed &&
-      SUPPORTED_FUNCTION_TYPES.includes(trimmed as SupportedFunctionType)
-    ) {
-      return trimmed as SupportedFunctionType;
-    }
-
-    return 'custom';
   }
 }

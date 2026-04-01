@@ -10,12 +10,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { RunRequestDto } from './dto/run-request.dto';
 import { RunService } from './run.service';
 import { type RunResponse } from './types/run-response.type';
-
-interface UploadedWasmFile {
-  originalname?: string;
-  size?: number;
-  buffer?: Buffer;
-}
+import { type UploadedWasmFile } from './types/uploaded-wasm-file.type';
 
 @Controller()
 export class RunController {

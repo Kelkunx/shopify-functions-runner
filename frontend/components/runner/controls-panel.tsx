@@ -10,8 +10,8 @@ import {
   SidebarPanel,
   SidebarSection,
   TextInput,
-  runnerUiClassNames,
 } from "./runner-ui-primitives";
+import { runnerUiClassNames } from "./runner-ui-class-names";
 
 export function RunnerControlsPanel({
   currentExportName,

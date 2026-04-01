@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   formatTemplateInput,
   functionTypes,
   getTemplatesForType,
   type FunctionType,
 } from "@/lib/function-templates";
+import {
+  loadSavedFixtures,
+  persistSavedFixtures,
+  type RunnerMode,
+  type SavedFixture,
+} from "@/lib/saved-fixtures";
 import { JsonEditor } from "./json-editor";
 
 interface RunResponse {
@@ -23,6 +29,7 @@ const initialFunctionType: FunctionType = "product-discount";
 const initialTemplate = getTemplatesForType(initialFunctionType)[0]!;
 
 export function RunnerWorkspace() {
+  const [runnerMode, setRunnerMode] = useState<RunnerMode>("mock");
   const [functionType, setFunctionType] =
     useState<FunctionType>(initialFunctionType);
   const [inputJson, setInputJson] = useState(
@@ -33,16 +40,22 @@ export function RunnerWorkspace() {
   const [functionDir, setFunctionDir] = useState("");
   const [target, setTarget] = useState("");
   const [exportName, setExportName] = useState("run");
+  const [fixtureName, setFixtureName] = useState("");
+  const [savedFixtures, setSavedFixtures] = useState<SavedFixture[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [response, setResponse] = useState<RunResponse | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
 
-  const templates = getTemplatesForType(functionType);
+  useEffect(() => {
+    setSavedFixtures(loadSavedFixtures());
+  }, []);
 
+  const templates = getTemplatesForType(functionType);
   const selectedFunctionLabel =
     functionTypes.find((option) => option.value === functionType)?.label ??
     functionType;
-  const isRealRunnerMode = functionDir.trim().length > 0 && target.trim().length > 0;
+  const currentRunnerLabel =
+    runnerMode === "shopify" ? "Real Shopify runner" : selectedFunctionLabel;
 
   async function handleRun() {
     setIsRunning(true);
@@ -57,16 +70,10 @@ export function RunnerWorkspace() {
     formData.append("inputJson", inputJson);
     formData.append("functionType", functionType);
 
-    if (functionDir.trim()) {
+    if (runnerMode === "shopify") {
       formData.append("functionDir", functionDir.trim());
-    }
-
-    if (target.trim()) {
       formData.append("target", target.trim());
-    }
-
-    if (exportName.trim()) {
-      formData.append("exportName", exportName.trim());
+      formData.append("exportName", exportName.trim() || "run");
     }
 
     try {
@@ -118,20 +125,100 @@ export function RunnerWorkspace() {
     setRequestError(null);
   }
 
+  function handleRunnerModeChange(nextMode: RunnerMode) {
+    setRunnerMode(nextMode);
+    setResponse(null);
+    setRequestError(null);
+  }
+
+  function saveFixture() {
+    const trimmedName = fixtureName.trim();
+
+    if (!trimmedName) {
+      setRequestError("Name the fixture before saving it.");
+      return;
+    }
+
+    const nextFixture: SavedFixture = {
+      id: crypto.randomUUID(),
+      name: trimmedName,
+      createdAt: new Date().toISOString(),
+      exportName,
+      functionDir,
+      functionType,
+      inputJson,
+      runnerMode,
+      target,
+    };
+
+    const nextFixtures = [nextFixture, ...savedFixtures].slice(0, 12);
+
+    setSavedFixtures(nextFixtures);
+    persistSavedFixtures(nextFixtures);
+    setFixtureName("");
+    setRequestError(null);
+  }
+
+  function loadFixture(fixture: SavedFixture) {
+    setRunnerMode(fixture.runnerMode);
+    setFunctionType(fixture.functionType);
+    setInputJson(fixture.inputJson);
+    setSelectedTemplateId("");
+    setFunctionDir(fixture.functionDir);
+    setTarget(fixture.target);
+    setExportName(fixture.exportName);
+    setResponse(null);
+    setRequestError(null);
+  }
+
+  function deleteFixture(fixtureId: string) {
+    const nextFixtures = savedFixtures.filter((fixture) => fixture.id !== fixtureId);
+
+    setSavedFixtures(nextFixtures);
+    persistSavedFixtures(nextFixtures);
+  }
+
   const outputJson = response ? JSON.stringify(response.output, null, 2) : "{}";
 
   return (
     <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col px-5 py-5 lg:px-8 lg:py-8">
-      <div className="grid flex-1 gap-5 xl:grid-cols-[280px_minmax(0,1fr)_340px]">
+      <div className="grid flex-1 gap-5 xl:grid-cols-[320px_minmax(0,1fr)_340px]">
         <aside className="flex flex-col gap-4 rounded-[10px] border border-border bg-surface px-4 py-4">
           <div className="space-y-1 border-b border-border pb-4">
             <h1 className="text-xl font-semibold tracking-[-0.02em] text-foreground">
               Shopify Functions Local Runner
             </h1>
             <p className="text-sm leading-6 text-muted">
-              Upload a function binary, send GraphQL-shaped JSON input, and inspect
-              the local result without deploying.
+              Test payloads quickly in mock mode, or switch to the real Shopify
+              runner when you have a local function directory.
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-sm font-medium text-foreground">Runner mode</div>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                ["mock", "Mock"],
+                ["shopify", "Shopify"],
+              ] as const).map(([value, label]) => {
+                const isActive = runnerMode === value;
+
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => handleRunnerModeChange(value)}
+                    className={`rounded-[8px] border px-3 py-2 text-sm transition ${
+                      isActive
+                        ? "border-primary-strong bg-amber-50 text-foreground"
+                        : "border-border bg-surface-strong text-muted hover:border-border-strong hover:text-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <label className="space-y-2">
@@ -146,9 +233,8 @@ export function RunnerWorkspace() {
               className="block w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground file:mr-3 file:rounded-[6px] file:border-0 file:bg-stone-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-50"
             />
             <p className="text-xs leading-5 text-muted">
-              Optional. In real Shopify mode, an uploaded file overrides the built
-              function Wasm. Without advanced metadata below, the app falls back to a
-              mock runner.
+              Optional. In Shopify mode, an uploaded file overrides the built Wasm
+              for the current run.
             </p>
           </label>
 
@@ -193,59 +279,121 @@ export function RunnerWorkspace() {
             </div>
           </div>
 
-          <div className="space-y-3 border-t border-border pt-4">
-            <div>
-              <div className="text-sm font-medium text-foreground">
-                Shopify runner mode
+          {runnerMode === "shopify" ? (
+            <div className="space-y-3 border-t border-border pt-4">
+              <div>
+                <div className="text-sm font-medium text-foreground">
+                  Shopify runner details
+                </div>
+                <p className="mt-1 text-xs leading-5 text-muted">
+                  The backend resolves metadata with Shopify CLI and runs the
+                  official function-runner binary.
+                </p>
               </div>
-              <p className="mt-1 text-xs leading-5 text-muted">
-                Add a local function directory and target to use Shopify CLI metadata
-                and execute the real function-runner binary.
-              </p>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-foreground">
+                  Function directory
+                </span>
+                <input
+                  type="text"
+                  value={functionDir}
+                  onChange={(event) => setFunctionDir(event.target.value)}
+                  placeholder="/path/to/shopify-app/extensions/my-function"
+                  className="w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-foreground">Target</span>
+                <input
+                  type="text"
+                  value={target}
+                  onChange={(event) => setTarget(event.target.value)}
+                  placeholder="purchase.product-discount.run"
+                  className="w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-foreground">Export</span>
+                <input
+                  type="text"
+                  value={exportName}
+                  onChange={(event) => setExportName(event.target.value)}
+                  placeholder="run"
+                  className="w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
+                />
+              </label>
+            </div>
+          ) : null}
+
+          <div className="space-y-3 border-t border-border pt-4">
+            <div className="text-sm font-medium text-foreground">Saved fixtures</div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={fixtureName}
+                onChange={(event) => setFixtureName(event.target.value)}
+                placeholder="Fixture name"
+                className="min-w-0 flex-1 rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
+              />
+              <button
+                type="button"
+                onClick={saveFixture}
+                className="rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground transition hover:border-border-strong"
+              >
+                Save
+              </button>
             </div>
 
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-foreground">
-                Function directory
-              </span>
-              <input
-                type="text"
-                value={functionDir}
-                onChange={(event) => setFunctionDir(event.target.value)}
-                placeholder="/path/to/shopify-app/extensions/my-function"
-                className="w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
-              />
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-foreground">Target</span>
-              <input
-                type="text"
-                value={target}
-                onChange={(event) => setTarget(event.target.value)}
-                placeholder="purchase.product-discount.run"
-                className="w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
-              />
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-foreground">Export</span>
-              <input
-                type="text"
-                value={exportName}
-                onChange={(event) => setExportName(event.target.value)}
-                placeholder="run"
-                className="w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
-              />
-            </label>
+            <div className="flex max-h-[220px] flex-col gap-2 overflow-auto pr-1">
+              {savedFixtures.length > 0 ? (
+                savedFixtures.map((fixture) => (
+                  <div
+                    key={fixture.id}
+                    className="rounded-[8px] border border-border bg-surface-strong px-3 py-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-foreground">
+                          {fixture.name}
+                        </div>
+                        <div className="mt-1 text-xs text-muted">
+                          {fixture.runnerMode === "shopify"
+                            ? "Shopify runner"
+                            : fixture.functionType}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => deleteFixture(fixture.id)}
+                        className="text-xs text-muted transition hover:text-foreground"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => loadFixture(fixture)}
+                      className="mt-3 rounded-[8px] border border-border px-3 py-2 text-sm text-foreground transition hover:border-border-strong"
+                    >
+                      Load
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-muted">
+                  No saved fixtures yet.
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mt-auto rounded-[8px] border border-border bg-surface-strong px-3 py-3 text-sm text-muted">
-            <div className="font-medium text-foreground">
-              {isRealRunnerMode ? "Real Shopify runner" : selectedFunctionLabel}
-            </div>
+            <div className="font-medium text-foreground">{currentRunnerLabel}</div>
             <div className="mt-1 break-all">
-              {isRealRunnerMode
+              {runnerMode === "shopify"
                 ? functionDir || "Waiting for function directory"
                 : wasmFile
                   ? wasmFile.name
@@ -348,9 +496,9 @@ export function RunnerWorkspace() {
                 </dd>
               </div>
               <div className="rounded-[8px] border border-border bg-surface-strong px-3 py-3">
-                <dt className="text-muted">Function</dt>
+                <dt className="text-muted">Mode</dt>
                 <dd className="mt-1 text-lg font-semibold text-foreground">
-                  {isRealRunnerMode ? "Shopify runner" : selectedFunctionLabel}
+                  {runnerMode === "shopify" ? "Shopify" : "Mock"}
                 </dd>
               </div>
             </dl>

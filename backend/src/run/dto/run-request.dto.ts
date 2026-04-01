@@ -2,6 +2,7 @@ export const SUPPORTED_FUNCTION_TYPES = [
   'product-discount',
   'delivery-customization',
   'cart-transform',
+  'custom',
 ] as const;
 
 export type SupportedFunctionType = (typeof SUPPORTED_FUNCTION_TYPES)[number];

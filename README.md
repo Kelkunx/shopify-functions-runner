@@ -29,8 +29,11 @@ Implemented:
   - `product-discount`
   - `delivery-customization`
   - `cart-transform`
+  - `custom`
 - frontend single-page runner UI
 - Monaco JSON editor
+- explicit mock vs Shopify runner modes
+- saved local fixtures in the browser
 - result, error, and execution time panels
 
 Current limitation:
@@ -68,6 +71,7 @@ Request uses `multipart/form-data`:
 - `wasm`: uploaded `.wasm` file
 - `inputJson`: JSON payload as string
 - `functionType`: string
+- `functionType` is assistive and can fall back to `custom` in mock mode
 - `functionDir` (optional): local Shopify function directory
 - `target` (optional): Shopify target key
 - `exportName` (optional): function export name, defaults to `run`
@@ -144,6 +148,7 @@ Used when only JSON, templates, and an optional `.wasm` file are provided.
 - fast local feedback
 - no Shopify CLI metadata required
 - useful for UI and payload iteration
+- unknown or omitted function types fall back to `custom`
 
 ### Real Shopify mode
 
@@ -152,6 +157,12 @@ Used when `functionDir` and `target` are provided.
 - backend resolves `functionRunnerPath`, `schemaPath`, `wasmPath`, and targeting via Shopify CLI
 - backend invokes Shopify's official `function-runner`
 - an uploaded `.wasm` file overrides the built Wasm for that single run
+
+## Fixtures
+
+- the UI can save named fixtures to browser local storage
+- a fixture stores the current runner mode, function type, JSON input, and Shopify runner fields
+- fixtures are intended for fast local iteration, not source-controlled test cases
 
 ## Development Commands
 
@@ -206,7 +217,7 @@ npm run lint
 - make the real Shopify runner the primary path and reduce reliance on mock mode
 - add Shopify Function templates per target, not just per simplified function type
 - improve backend validation for malformed Shopify payloads
-- support loading and saving local test fixtures
+- add import/export for fixtures so they can be shared across machines
 
 ## Performance Notes
 

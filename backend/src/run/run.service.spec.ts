@@ -55,10 +55,7 @@ describe('RunService', () => {
 
     expect(response.success).toBe(false);
     expect(response.output).toEqual({});
-    expect(response.errors).toEqual([
-      'Unsupported function type "unknown-type". Supported types: product-discount, delivery-customization, cart-transform.',
-      'Input JSON is invalid.',
-    ]);
+    expect(response.errors).toEqual(['Input JSON is invalid.']);
   });
 
   it('allows running without an uploaded wasm while the runner is mocked', async () => {
@@ -79,6 +76,29 @@ describe('RunService', () => {
       functionType: 'cart-transform',
       wasmFileName: 'mock-runner.wasm',
       usedUploadedWasm: false,
+    });
+  });
+
+  it('falls back to custom mock mode for unknown function types', async () => {
+    const response = await service.runFunction({
+      functionType: 'my-own-function-type',
+      inputJson: JSON.stringify({
+        anything: true,
+      }),
+    });
+
+    expect(response.success).toBe(true);
+    expect(response.errors).toEqual([]);
+    expect(response.output).toMatchObject({
+      mockRunner: true,
+      functionType: 'custom',
+      requestedFunctionType: 'my-own-function-type',
+      inputSummary: {
+        topLevelKeys: 1,
+      },
+      echo: {
+        anything: true,
+      },
     });
   });
 

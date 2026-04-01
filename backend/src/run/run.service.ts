@@ -19,7 +19,7 @@ interface UploadedWasmFile {
 interface RunFunctionParams {
   wasmFile?: UploadedWasmFile;
   inputJson: string;
-  functionType: string;
+  functionType?: string;
   functionDir?: string;
   target?: string;
   exportName?: string;
@@ -42,18 +42,10 @@ export class RunService {
     const startTime = process.hrtime.bigint();
     const errors: string[] = [];
     const hasRealRunnerConfig = Boolean(functionDir?.trim() && target?.trim());
+    const normalizedFunctionType = this.normalizeFunctionType(functionType);
 
     if (wasmFile?.originalname && !wasmFile.originalname.endsWith('.wasm')) {
       errors.push('The uploaded file must have a .wasm extension.');
-    }
-
-    if (
-      !hasRealRunnerConfig &&
-      !SUPPORTED_FUNCTION_TYPES.includes(functionType as SupportedFunctionType)
-    ) {
-      errors.push(
-        `Unsupported function type "${functionType}". Supported types: ${SUPPORTED_FUNCTION_TYPES.join(', ')}.`,
-      );
     }
 
     if (
@@ -87,7 +79,8 @@ export class RunService {
             wasmFile,
           })
         : this.executeMockRunner({
-            functionType: functionType as SupportedFunctionType,
+            functionType: normalizedFunctionType,
+            requestedFunctionType: functionType?.trim(),
             parsedInput: parsedInput ?? {},
             wasmFile,
           });
@@ -159,10 +152,12 @@ export class RunService {
   // This mock remains useful for the UI before a developer wires real Shopify metadata.
   private executeMockRunner({
     functionType,
+    requestedFunctionType,
     parsedInput,
     wasmFile,
   }: {
     functionType: SupportedFunctionType;
+    requestedFunctionType?: string;
     parsedInput: Record<string, unknown>;
     wasmFile?: UploadedWasmFile;
   }): Record<string, unknown> {
@@ -173,6 +168,10 @@ export class RunService {
     const baseMetadata = {
       mockRunner: true,
       functionType,
+      requestedFunctionType:
+        requestedFunctionType && requestedFunctionType !== functionType
+          ? requestedFunctionType
+          : undefined,
       wasmFileName: wasmFile?.originalname ?? 'mock-runner.wasm',
       wasmSizeBytes: wasmFile?.size ?? wasmFile?.buffer?.length ?? 0,
       usedUploadedWasm: Boolean(wasmFile?.buffer?.length),
@@ -207,6 +206,15 @@ export class RunService {
           inputSummary: {
             cartLines: this.getNestedArrayLength(parsedInput, 'cart', 'lines'),
           },
+        };
+      case 'custom':
+        return {
+          ...baseMetadata,
+          output: {},
+          inputSummary: {
+            topLevelKeys: Object.keys(parsedInput).length,
+          },
+          echo: parsedInput,
         };
     }
   }
@@ -277,5 +285,18 @@ export class RunService {
     await fs.writeFile(temporaryWasmPath, wasmFile.buffer);
 
     return temporaryWasmPath;
+  }
+
+  private normalizeFunctionType(functionType?: string): SupportedFunctionType {
+    const trimmed = functionType?.trim();
+
+    if (
+      trimmed &&
+      SUPPORTED_FUNCTION_TYPES.includes(trimmed as SupportedFunctionType)
+    ) {
+      return trimmed as SupportedFunctionType;
+    }
+
+    return 'custom';
   }
 }

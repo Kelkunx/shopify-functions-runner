@@ -1,7 +1,8 @@
 export type FunctionType =
   | "product-discount"
   | "delivery-customization"
-  | "cart-transform";
+  | "cart-transform"
+  | "custom";
 
 export interface FunctionTemplate {
   id: string;
@@ -14,6 +15,7 @@ export const functionTypes: { value: FunctionType; label: string }[] = [
   { value: "product-discount", label: "Product discount" },
   { value: "delivery-customization", label: "Delivery customization" },
   { value: "cart-transform", label: "Cart transform" },
+  { value: "custom", label: "Custom" },
 ];
 
 export const functionTemplates: FunctionTemplate[] = [
@@ -111,6 +113,27 @@ export const functionTemplates: FunctionTemplate[] = [
             },
           },
         ],
+      },
+    },
+  },
+  {
+    id: "custom-empty",
+    label: "Custom payload",
+    functionType: "custom",
+    input: {
+      cart: {},
+    },
+  },
+  {
+    id: "custom-debug",
+    label: "Debug payload",
+    functionType: "custom",
+    input: {
+      cart: {
+        lines: [],
+      },
+      debug: {
+        note: "Use this payload when you want to test arbitrary fields.",
       },
     },
   },

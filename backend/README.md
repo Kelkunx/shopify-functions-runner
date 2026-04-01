@@ -18,6 +18,8 @@ The backend now supports two paths:
 - mock mode for quick local DX without Shopify metadata
 - real Shopify mode using Shopify CLI metadata plus the official `function-runner`
 
+In mock mode, `functionType` is assistive only and can fall back to `custom`.
+
 ## Main Files
 
 - `src/main.ts`: Nest bootstrap and CORS setup

@@ -24,14 +24,17 @@ export class RunController {
   @Post('run')
   @HttpCode(200)
   @UseInterceptors(FileInterceptor('wasm'))
-  run(
+  async run(
     @UploadedFile() wasmFile: UploadedWasmFile | undefined,
     @Body() body: RunRequestDto,
-  ): RunResponse {
+  ): Promise<RunResponse> {
     return this.runService.runFunction({
       wasmFile,
       inputJson: body.inputJson ?? '',
       functionType: body.functionType ?? '',
+      functionDir: body.functionDir,
+      target: body.target,
+      exportName: body.exportName,
     });
   }
 }

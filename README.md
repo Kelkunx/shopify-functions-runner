@@ -24,6 +24,7 @@ Implemented:
 - `POST /run` backend endpoint
 - multipart upload support for a `.wasm` file
 - JSON input handling
+- real Shopify execution path using Shopify CLI metadata and `function-runner`
 - function type selection for:
   - `product-discount`
   - `delivery-customization`
@@ -34,8 +35,8 @@ Implemented:
 
 Current limitation:
 
-- the backend execution layer is still mocked
-- the API contract is stable, but real WASI execution is the next step
+- the simple path still falls back to a mock runner when Shopify metadata is not provided
+- real Shopify execution requires a local function directory and target metadata
 - because the runner is mocked, testing without a real `.wasm` file is supported
 
 ## Tech Stack
@@ -67,6 +68,9 @@ Request uses `multipart/form-data`:
 - `wasm`: uploaded `.wasm` file
 - `inputJson`: JSON payload as string
 - `functionType`: string
+- `functionDir` (optional): local Shopify function directory
+- `target` (optional): Shopify target key
+- `exportName` (optional): function export name, defaults to `run`
 
 Response:
 
@@ -85,6 +89,7 @@ Requirements:
 
 - Node.js 20+
 - npm
+- Shopify CLI if you want to use the real Shopify runner path
 
 Install everything from the monorepo root:
 
@@ -129,6 +134,24 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
 ```
 
 If not set, it defaults to `http://localhost:3001`.
+
+## Runner Modes
+
+### Mock mode
+
+Used when only JSON, templates, and an optional `.wasm` file are provided.
+
+- fast local feedback
+- no Shopify CLI metadata required
+- useful for UI and payload iteration
+
+### Real Shopify mode
+
+Used when `functionDir` and `target` are provided.
+
+- backend resolves `functionRunnerPath`, `schemaPath`, `wasmPath`, and targeting via Shopify CLI
+- backend invokes Shopify's official `function-runner`
+- an uploaded `.wasm` file overrides the built Wasm for that single run
 
 ## Development Commands
 
@@ -180,8 +203,8 @@ npm run lint
 
 ## Next Steps
 
-- replace the mock runner with real WASI execution
-- add Shopify Function input templates per function type
+- make the real Shopify runner the primary path and reduce reliance on mock mode
+- add Shopify Function templates per target, not just per simplified function type
 - improve backend validation for malformed Shopify payloads
 - support loading and saving local test fixtures
 

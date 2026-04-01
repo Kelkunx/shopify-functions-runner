@@ -10,6 +10,7 @@ The frontend provides a single-page developer tool to:
 - load a JSON input template
 - edit JSON with Monaco Editor
 - optionally upload a `.wasm` file
+- optionally provide a Shopify function directory and target for real execution
 - call the local backend runner
 - inspect output, errors, and execution time
 
@@ -37,3 +38,4 @@ npm run lint
 - `dev` runs Next.js in webpack mode because it behaved more predictably than Turbopack in this environment
 - `dev:light` disables source maps and server fast refresh to reduce local resource usage
 - the frontend defaults to `http://localhost:3001` for the backend API unless `NEXT_PUBLIC_API_BASE_URL` is set
+- if `functionDir` and `target` are provided in the UI, the backend switches from mock mode to the real Shopify runner path

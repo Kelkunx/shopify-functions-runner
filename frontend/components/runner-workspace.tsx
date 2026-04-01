@@ -30,6 +30,9 @@ export function RunnerWorkspace() {
   );
   const [selectedTemplateId, setSelectedTemplateId] = useState(initialTemplate.id);
   const [wasmFile, setWasmFile] = useState<File | null>(null);
+  const [functionDir, setFunctionDir] = useState("");
+  const [target, setTarget] = useState("");
+  const [exportName, setExportName] = useState("run");
   const [isRunning, setIsRunning] = useState(false);
   const [response, setResponse] = useState<RunResponse | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -39,6 +42,7 @@ export function RunnerWorkspace() {
   const selectedFunctionLabel =
     functionTypes.find((option) => option.value === functionType)?.label ??
     functionType;
+  const isRealRunnerMode = functionDir.trim().length > 0 && target.trim().length > 0;
 
   async function handleRun() {
     setIsRunning(true);
@@ -52,6 +56,18 @@ export function RunnerWorkspace() {
 
     formData.append("inputJson", inputJson);
     formData.append("functionType", functionType);
+
+    if (functionDir.trim()) {
+      formData.append("functionDir", functionDir.trim());
+    }
+
+    if (target.trim()) {
+      formData.append("target", target.trim());
+    }
+
+    if (exportName.trim()) {
+      formData.append("exportName", exportName.trim());
+    }
 
     try {
       const runResponse = await fetch(`${apiBaseUrl}/run`, {
@@ -130,8 +146,9 @@ export function RunnerWorkspace() {
               className="block w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground file:mr-3 file:rounded-[6px] file:border-0 file:bg-stone-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-50"
             />
             <p className="text-xs leading-5 text-muted">
-              Optional for now. If no file is selected, the mocked runner still lets
-              you test the request flow locally.
+              Optional. In real Shopify mode, an uploaded file overrides the built
+              function Wasm. Without advanced metadata below, the app falls back to a
+              mock runner.
             </p>
           </label>
 
@@ -176,10 +193,63 @@ export function RunnerWorkspace() {
             </div>
           </div>
 
+          <div className="space-y-3 border-t border-border pt-4">
+            <div>
+              <div className="text-sm font-medium text-foreground">
+                Shopify runner mode
+              </div>
+              <p className="mt-1 text-xs leading-5 text-muted">
+                Add a local function directory and target to use Shopify CLI metadata
+                and execute the real function-runner binary.
+              </p>
+            </div>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-foreground">
+                Function directory
+              </span>
+              <input
+                type="text"
+                value={functionDir}
+                onChange={(event) => setFunctionDir(event.target.value)}
+                placeholder="/path/to/shopify-app/extensions/my-function"
+                className="w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-foreground">Target</span>
+              <input
+                type="text"
+                value={target}
+                onChange={(event) => setTarget(event.target.value)}
+                placeholder="purchase.product-discount.run"
+                className="w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-foreground">Export</span>
+              <input
+                type="text"
+                value={exportName}
+                onChange={(event) => setExportName(event.target.value)}
+                placeholder="run"
+                className="w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
+              />
+            </label>
+          </div>
+
           <div className="mt-auto rounded-[8px] border border-border bg-surface-strong px-3 py-3 text-sm text-muted">
-            <div className="font-medium text-foreground">{selectedFunctionLabel}</div>
+            <div className="font-medium text-foreground">
+              {isRealRunnerMode ? "Real Shopify runner" : selectedFunctionLabel}
+            </div>
             <div className="mt-1 break-all">
-              {wasmFile ? wasmFile.name : "Mock runner only"}
+              {isRealRunnerMode
+                ? functionDir || "Waiting for function directory"
+                : wasmFile
+                  ? wasmFile.name
+                  : "Mock runner only"}
             </div>
           </div>
         </aside>
@@ -280,7 +350,7 @@ export function RunnerWorkspace() {
               <div className="rounded-[8px] border border-border bg-surface-strong px-3 py-3">
                 <dt className="text-muted">Function</dt>
                 <dd className="mt-1 text-lg font-semibold text-foreground">
-                  {selectedFunctionLabel}
+                  {isRealRunnerMode ? "Shopify runner" : selectedFunctionLabel}
                 </dd>
               </div>
             </dl>

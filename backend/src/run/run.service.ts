@@ -1,8 +1,13 @@
 import { Injectable } from '@nestjs/common';
+import { promises as fs } from 'node:fs';
+import type { Stats } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   SUPPORTED_FUNCTION_TYPES,
   type SupportedFunctionType,
 } from './dto/run-request.dto';
+import { ShopifyFunctionRunnerService } from './shopify-function-runner.service';
 import { type RunResponse } from './types/run-response.type';
 
 interface UploadedWasmFile {
@@ -15,27 +20,48 @@ interface RunFunctionParams {
   wasmFile?: UploadedWasmFile;
   inputJson: string;
   functionType: string;
+  functionDir?: string;
+  target?: string;
+  exportName?: string;
 }
 
 @Injectable()
 export class RunService {
-  runFunction({
+  constructor(
+    private readonly shopifyFunctionRunner: ShopifyFunctionRunnerService,
+  ) {}
+
+  async runFunction({
     wasmFile,
     inputJson,
     functionType,
-  }: RunFunctionParams): RunResponse {
+    functionDir,
+    target,
+    exportName,
+  }: RunFunctionParams): Promise<RunResponse> {
     const startTime = process.hrtime.bigint();
     const errors: string[] = [];
+    const hasRealRunnerConfig = Boolean(functionDir?.trim() && target?.trim());
 
     if (wasmFile?.originalname && !wasmFile.originalname.endsWith('.wasm')) {
       errors.push('The uploaded file must have a .wasm extension.');
     }
 
     if (
+      !hasRealRunnerConfig &&
       !SUPPORTED_FUNCTION_TYPES.includes(functionType as SupportedFunctionType)
     ) {
       errors.push(
         `Unsupported function type "${functionType}". Supported types: ${SUPPORTED_FUNCTION_TYPES.join(', ')}.`,
+      );
+    }
+
+    if (
+      (functionDir?.trim() && !target?.trim()) ||
+      (!functionDir?.trim() && target?.trim())
+    ) {
+      errors.push(
+        'Both functionDir and target are required to use the real Shopify runner.',
       );
     }
 
@@ -52,11 +78,19 @@ export class RunService {
     }
 
     try {
-      const output = this.executeMockRunner({
-        functionType: functionType as SupportedFunctionType,
-        parsedInput: parsedInput ?? {},
-        wasmFile,
-      });
+      const output = hasRealRunnerConfig
+        ? await this.executeShopifyRunner({
+            exportName,
+            functionDir: functionDir!.trim(),
+            parsedInput: parsedInput ?? {},
+            target: target!.trim(),
+            wasmFile,
+          })
+        : this.executeMockRunner({
+            functionType: functionType as SupportedFunctionType,
+            parsedInput: parsedInput ?? {},
+            wasmFile,
+          });
 
       return this.buildResponse(true, output, startTime, []);
     } catch (error) {
@@ -67,7 +101,62 @@ export class RunService {
     }
   }
 
-  // This mock keeps the API stable while the real WASI runtime is added later.
+  private async executeShopifyRunner({
+    exportName,
+    functionDir,
+    parsedInput,
+    target,
+    wasmFile,
+  }: {
+    exportName?: string;
+    functionDir: string;
+    parsedInput: Record<string, unknown>;
+    target: string;
+    wasmFile?: UploadedWasmFile;
+  }): Promise<Record<string, unknown>> {
+    await this.assertDirectoryExists(functionDir);
+
+    const functionInfo =
+      await this.shopifyFunctionRunner.getFunctionInfo(functionDir);
+    const queryPath = functionInfo.targeting[target]?.inputQueryPath;
+
+    if (!queryPath) {
+      throw new Error(
+        `Unknown target "${target}" for functionDir "${functionDir}".`,
+      );
+    }
+
+    const exportToRun = exportName?.trim() || 'run';
+    const temporaryWasmPath = await this.writeTemporaryWasmFile(wasmFile);
+    const wasmPath = temporaryWasmPath ?? functionInfo.wasmPath;
+
+    try {
+      const result = await this.shopifyFunctionRunner.runFunction(
+        {
+          export: exportToRun,
+          input: parsedInput,
+          expectedOutput: {},
+          target,
+        },
+        functionInfo.functionRunnerPath,
+        wasmPath,
+        queryPath,
+        functionInfo.schemaPath,
+      );
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      return result.result?.output ?? {};
+    } finally {
+      if (temporaryWasmPath) {
+        await fs.unlink(temporaryWasmPath).catch(() => undefined);
+      }
+    }
+  }
+
+  // This mock remains useful for the UI before a developer wires real Shopify metadata.
   private executeMockRunner({
     functionType,
     parsedInput,
@@ -156,5 +245,37 @@ export class RunService {
 
     return ((parentValue as Record<string, unknown>)[childKey] as unknown[])
       .length;
+  }
+
+  private async assertDirectoryExists(functionDir: string): Promise<void> {
+    let stat: Stats;
+
+    try {
+      stat = await fs.stat(functionDir);
+    } catch {
+      throw new Error(`functionDir does not exist: ${functionDir}`);
+    }
+
+    if (!stat.isDirectory()) {
+      throw new Error(`functionDir is not a directory: ${functionDir}`);
+    }
+  }
+
+  private async writeTemporaryWasmFile(
+    wasmFile?: UploadedWasmFile,
+  ): Promise<string | null> {
+    if (!wasmFile?.buffer?.length) {
+      return null;
+    }
+
+    const temporaryDirectory = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'shopify-function-runner-'),
+    );
+    const fileName = wasmFile.originalname ?? 'uploaded-function.wasm';
+    const temporaryWasmPath = path.join(temporaryDirectory, fileName);
+
+    await fs.writeFile(temporaryWasmPath, wasmFile.buffer);
+
+    return temporaryWasmPath;
   }
 }

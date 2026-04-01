@@ -9,4 +9,7 @@ export type SupportedFunctionType = (typeof SUPPORTED_FUNCTION_TYPES)[number];
 export class RunRequestDto {
   inputJson = '';
   functionType = '';
+  functionDir?: string;
+  target?: string;
+  exportName?: string;
 }

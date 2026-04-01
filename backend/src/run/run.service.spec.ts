@@ -1,14 +1,26 @@
 import { RunService } from './run.service';
+import { ShopifyFunctionRunnerService } from './shopify-function-runner.service';
 
 describe('RunService', () => {
+  let getFunctionInfoMock: jest.Mock;
+  let runFunctionMock: jest.Mock;
+  let shopifyRunner: jest.Mocked<ShopifyFunctionRunnerService>;
   let service: RunService;
 
   beforeEach(() => {
-    service = new RunService();
+    getFunctionInfoMock = jest.fn();
+    runFunctionMock = jest.fn();
+
+    shopifyRunner = {
+      getFunctionInfo: getFunctionInfoMock,
+      runFunction: runFunctionMock,
+    } as unknown as jest.Mocked<ShopifyFunctionRunnerService>;
+
+    service = new RunService(shopifyRunner);
   });
 
-  it('returns a mock success response for a supported function', () => {
-    const response = service.runFunction({
+  it('returns a mock success response for a supported function', async () => {
+    const response = await service.runFunction({
       wasmFile: {
         originalname: 'discount.wasm',
         size: 16,
@@ -34,8 +46,8 @@ describe('RunService', () => {
     });
   });
 
-  it('returns validation errors for invalid requests', () => {
-    const response = service.runFunction({
+  it('returns validation errors for invalid requests', async () => {
+    const response = await service.runFunction({
       wasmFile: undefined,
       functionType: 'unknown-type',
       inputJson: '{bad json}',
@@ -49,8 +61,8 @@ describe('RunService', () => {
     ]);
   });
 
-  it('allows running without an uploaded wasm while the runner is mocked', () => {
-    const response = service.runFunction({
+  it('allows running without an uploaded wasm while the runner is mocked', async () => {
+    const response = await service.runFunction({
       wasmFile: undefined,
       functionType: 'cart-transform',
       inputJson: JSON.stringify({
@@ -68,5 +80,53 @@ describe('RunService', () => {
       wasmFileName: 'mock-runner.wasm',
       usedUploadedWasm: false,
     });
+  });
+
+  it('uses the real Shopify runner when functionDir and target are provided', async () => {
+    getFunctionInfoMock.mockResolvedValue({
+      functionRunnerPath: '/tmp/function-runner',
+      schemaPath: '/tmp/schema.graphql',
+      targeting: {
+        'purchase.product-discount.run': {
+          inputQueryPath: '/tmp/input.graphql',
+        },
+      },
+      wasmPath: '/tmp/function.wasm',
+    });
+
+    runFunctionMock.mockResolvedValue({
+      error: null,
+      result: {
+        output: {
+          discounts: [],
+        },
+      },
+    });
+
+    const response = await service.runFunction({
+      functionDir: __dirname,
+      functionType: 'anything-goes-here',
+      inputJson: JSON.stringify({ cart: { lines: [] } }),
+      target: 'purchase.product-discount.run',
+    });
+
+    expect(response.success).toBe(true);
+    expect(response.errors).toEqual([]);
+    expect(response.output).toEqual({
+      discounts: [],
+    });
+    expect(getFunctionInfoMock).toHaveBeenCalledWith(__dirname);
+    expect(runFunctionMock).toHaveBeenCalledWith(
+      {
+        export: 'run',
+        expectedOutput: {},
+        input: { cart: { lines: [] } },
+        target: 'purchase.product-discount.run',
+      },
+      '/tmp/function-runner',
+      '/tmp/function.wasm',
+      '/tmp/input.graphql',
+      '/tmp/schema.graphql',
+    );
   });
 });

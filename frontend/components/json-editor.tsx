@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full min-h-[420px] items-center justify-center bg-stone-950 text-sm text-stone-400">
+    <div className="flex h-full min-h-105 items-center justify-center bg-stone-950 text-sm text-stone-400">
       Loading editor...
     </div>
   ),

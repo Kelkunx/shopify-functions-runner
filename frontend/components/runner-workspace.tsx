@@ -43,6 +43,10 @@ export function RunnerWorkspace() {
   const [fixtureName, setFixtureName] = useState("");
   const [savedFixtures, setSavedFixtures] = useState<SavedFixture[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [isOutputExpanded, setIsOutputExpanded] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">(
+    "idle",
+  );
   const [response, setResponse] = useState<RunResponse | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
 
@@ -51,6 +55,9 @@ export function RunnerWorkspace() {
   }, []);
 
   const templates = getTemplatesForType(functionType);
+  const visibleFixtures = savedFixtures.filter(
+    (fixture) => fixture.runnerMode === runnerMode,
+  );
   const selectedFunctionLabel =
     functionTypes.find((option) => option.value === functionType)?.label ??
     functionType;
@@ -127,6 +134,7 @@ export function RunnerWorkspace() {
 
   function handleRunnerModeChange(nextMode: RunnerMode) {
     setRunnerMode(nextMode);
+    setFixtureName("");
     setResponse(null);
     setRequestError(null);
   }
@@ -180,9 +188,22 @@ export function RunnerWorkspace() {
 
   const outputJson = response ? JSON.stringify(response.output, null, 2) : "{}";
 
+  async function copyOutput() {
+    try {
+      await navigator.clipboard.writeText(outputJson);
+      setCopyStatus("copied");
+    } catch {
+      setCopyStatus("failed");
+    }
+
+    window.setTimeout(() => {
+      setCopyStatus("idle");
+    }, 1800);
+  }
+
   return (
-    <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col px-5 py-5 lg:px-8 lg:py-8">
-      <div className="grid flex-1 gap-5 xl:grid-cols-[320px_minmax(0,1fr)_340px]">
+    <main className="flex w-full flex-1 flex-col px-5 py-5 lg:px-8 lg:py-8">
+      <div className="grid flex-1 gap-5 xl:grid-cols-[360px_minmax(0,1fr)_400px]">
         <aside className="flex flex-col gap-4 rounded-[10px] border border-border bg-surface px-4 py-4">
           <div className="space-y-1 border-b border-border pb-4">
             <h1 className="text-xl font-semibold tracking-[-0.02em] text-foreground">
@@ -208,7 +229,7 @@ export function RunnerWorkspace() {
                     key={value}
                     type="button"
                     onClick={() => handleRunnerModeChange(value)}
-                    className={`rounded-[8px] border px-3 py-2 text-sm transition ${
+                    className={`rounded-lg border px-3 py-2 text-sm transition ${
                       isActive
                         ? "border-primary-strong bg-amber-50 text-foreground"
                         : "border-border bg-surface-strong text-muted hover:border-border-strong hover:text-foreground"
@@ -230,7 +251,7 @@ export function RunnerWorkspace() {
                 setWasmFile(event.target.files?.[0] ?? null);
                 setRequestError(null);
               }}
-              className="block w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground file:mr-3 file:rounded-[6px] file:border-0 file:bg-stone-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-50"
+              className="block w-full rounded-lg border border-border bg-surface-strong px-3 py-2 text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-stone-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-50"
             />
             <p className="text-xs leading-5 text-muted">
               Optional. In Shopify mode, an uploaded file overrides the built Wasm
@@ -245,7 +266,7 @@ export function RunnerWorkspace() {
               onChange={(event) =>
                 handleFunctionTypeChange(event.target.value as FunctionType)
               }
-              className="w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition focus:border-border-strong"
+              className="w-full rounded-lg border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition focus:border-border-strong"
             >
               {functionTypes.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -266,7 +287,7 @@ export function RunnerWorkspace() {
                     key={template.id}
                     type="button"
                     onClick={() => applyTemplate(template.id)}
-                    className={`rounded-[8px] border px-3 py-2 text-left text-sm transition ${
+                    className={`rounded-lg border px-3 py-2 text-left text-sm transition ${
                       isActive
                         ? "border-primary-strong bg-amber-50 text-foreground"
                         : "border-border bg-surface-strong text-muted hover:border-border-strong hover:text-foreground"
@@ -300,7 +321,7 @@ export function RunnerWorkspace() {
                   value={functionDir}
                   onChange={(event) => setFunctionDir(event.target.value)}
                   placeholder="/path/to/shopify-app/extensions/my-function"
-                  className="w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
+                  className="w-full rounded-lg border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
                 />
               </label>
 
@@ -311,7 +332,7 @@ export function RunnerWorkspace() {
                   value={target}
                   onChange={(event) => setTarget(event.target.value)}
                   placeholder="purchase.product-discount.run"
-                  className="w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
+                  className="w-full rounded-lg border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
                 />
               </label>
 
@@ -322,37 +343,39 @@ export function RunnerWorkspace() {
                   value={exportName}
                   onChange={(event) => setExportName(event.target.value)}
                   placeholder="run"
-                  className="w-full rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
+                  className="w-full rounded-lg border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
                 />
               </label>
             </div>
           ) : null}
 
           <div className="space-y-3 border-t border-border pt-4">
-            <div className="text-sm font-medium text-foreground">Saved fixtures</div>
+            <div className="text-sm font-medium text-foreground">
+              Saved {runnerMode === "shopify" ? "Shopify" : "mock"} fixtures
+            </div>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={fixtureName}
                 onChange={(event) => setFixtureName(event.target.value)}
                 placeholder="Fixture name"
-                className="min-w-0 flex-1 rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
+                className="min-w-0 flex-1 rounded-lg border border-border bg-surface-strong px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-stone-400 focus:border-border-strong"
               />
               <button
                 type="button"
                 onClick={saveFixture}
-                className="rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-foreground transition hover:border-border-strong"
+                className="rounded-lg border border-border bg-surface-strong px-3 py-2 text-sm text-foreground transition hover:border-border-strong"
               >
                 Save
               </button>
             </div>
 
-            <div className="flex max-h-[220px] flex-col gap-2 overflow-auto pr-1">
-              {savedFixtures.length > 0 ? (
-                savedFixtures.map((fixture) => (
+            <div className="flex max-h-55 flex-col gap-2 overflow-auto pr-1">
+              {visibleFixtures.length > 0 ? (
+                visibleFixtures.map((fixture) => (
                   <div
                     key={fixture.id}
-                    className="rounded-[8px] border border-border bg-surface-strong px-3 py-3"
+                    className="rounded-lg border border-border bg-surface-strong px-3 py-3"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -376,21 +399,21 @@ export function RunnerWorkspace() {
                     <button
                       type="button"
                       onClick={() => loadFixture(fixture)}
-                      className="mt-3 rounded-[8px] border border-border px-3 py-2 text-sm text-foreground transition hover:border-border-strong"
+                      className="mt-3 rounded-lg border border-border px-3 py-2 text-sm text-foreground transition hover:border-border-strong"
                     >
                       Load
                     </button>
                   </div>
                 ))
               ) : (
-                <div className="rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-sm text-muted">
-                  No saved fixtures yet.
+                <div className="rounded-lg border border-border bg-surface-strong px-3 py-2 text-sm text-muted">
+                  No saved {runnerMode === "shopify" ? "Shopify" : "mock"} fixtures yet.
                 </div>
               )}
             </div>
           </div>
 
-          <div className="mt-auto rounded-[8px] border border-border bg-surface-strong px-3 py-3 text-sm text-muted">
+          <div className="mt-auto rounded-lg border border-border bg-surface-strong px-3 py-3 text-sm text-muted">
             <div className="font-medium text-foreground">{currentRunnerLabel}</div>
             <div className="mt-1 break-all">
               {runnerMode === "shopify"
@@ -402,7 +425,7 @@ export function RunnerWorkspace() {
           </div>
         </aside>
 
-        <section className="flex min-h-[720px] flex-col overflow-hidden rounded-[10px] border border-border bg-surface">
+        <section className="flex min-h-180 flex-col overflow-hidden rounded-[10px] border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div>
               <h2 className="text-base font-semibold text-foreground">Input JSON</h2>
@@ -414,12 +437,12 @@ export function RunnerWorkspace() {
               type="button"
               onClick={handleRun}
               disabled={isRunning}
-              className="rounded-[8px] bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-400"
+              className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-400"
             >
               {isRunning ? "Running..." : "Run function"}
             </button>
           </div>
-          <div className="min-h-[620px] flex-1">
+          <div className="min-h-155 flex-1">
             <JsonEditor value={inputJson} onChange={setInputJson} />
           </div>
         </section>
@@ -433,19 +456,39 @@ export function RunnerWorkspace() {
                   Response payload from the backend runner.
                 </p>
               </div>
-              {response ? (
-                <span
-                  className={`rounded-[8px] border px-2.5 py-1 text-xs font-medium ${
-                    response.success
-                      ? "border-emerald-200 bg-emerald-50 text-success"
-                      : "border-red-200 bg-red-50 text-danger"
-                  }`}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsOutputExpanded(true)}
+                  className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground transition hover:border-border-strong"
                 >
-                  {response.success ? "Success" : "Failed"}
-                </span>
-              ) : null}
+                  Expand
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void copyOutput()}
+                  className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground transition hover:border-border-strong"
+                >
+                  {copyStatus === "copied"
+                    ? "Copied"
+                    : copyStatus === "failed"
+                      ? "Copy failed"
+                      : "Copy"}
+                </button>
+                {response ? (
+                  <span
+                    className={`rounded-lg border px-2.5 py-1 text-xs font-medium ${
+                      response.success
+                        ? "border-emerald-200 bg-emerald-50 text-success"
+                        : "border-red-200 bg-red-50 text-danger"
+                    }`}
+                  >
+                    {response.success ? "Success" : "Failed"}
+                  </span>
+                ) : null}
+              </div>
             </div>
-            <pre className="mt-3 max-h-[300px] overflow-auto rounded-[8px] bg-stone-950 px-3 py-3 font-mono text-[12px] leading-6 text-stone-100">
+            <pre className="mt-3 max-h-75 overflow-auto rounded-lg bg-stone-950 px-3 py-3 font-mono text-xs leading-6 text-stone-100">
               {outputJson}
             </pre>
           </section>
@@ -459,7 +502,7 @@ export function RunnerWorkspace() {
             </div>
             <div className="mt-3 space-y-2 text-sm leading-6">
               {requestError ? (
-                <div className="rounded-[8px] border border-red-200 bg-red-50 px-3 py-2 text-danger">
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-danger">
                   {requestError}
                 </div>
               ) : null}
@@ -468,13 +511,13 @@ export function RunnerWorkspace() {
                 response.errors.map((error) => (
                   <div
                     key={error}
-                    className="rounded-[8px] border border-red-200 bg-red-50 px-3 py-2 text-danger"
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-danger"
                   >
                     {error}
                   </div>
                 ))
               ) : !requestError ? (
-                <div className="rounded-[8px] border border-border bg-surface-strong px-3 py-2 text-muted">
+                <div className="rounded-lg border border-border bg-surface-strong px-3 py-2 text-muted">
                   No errors.
                 </div>
               ) : null}
@@ -489,13 +532,13 @@ export function RunnerWorkspace() {
               </p>
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-[8px] border border-border bg-surface-strong px-3 py-3">
+              <div className="rounded-lg border border-border bg-surface-strong px-3 py-3">
                 <dt className="text-muted">Execution</dt>
                 <dd className="mt-1 text-lg font-semibold text-foreground">
                   {response ? `${response.executionTimeMs} ms` : "Waiting"}
                 </dd>
               </div>
-              <div className="rounded-[8px] border border-border bg-surface-strong px-3 py-3">
+              <div className="rounded-lg border border-border bg-surface-strong px-3 py-3">
                 <dt className="text-muted">Mode</dt>
                 <dd className="mt-1 text-lg font-semibold text-foreground">
                   {runnerMode === "shopify" ? "Shopify" : "Mock"}
@@ -505,6 +548,48 @@ export function RunnerWorkspace() {
           </section>
         </aside>
       </div>
+
+      {isOutputExpanded ? (
+        <div className="fixed inset-0 z-50 bg-stone-950/45 p-5 backdrop-blur-[2px] lg:p-8">
+          <div className="mx-auto flex h-full w-full max-w-350 flex-col rounded-[10px] border border-border-strong bg-surface-strong">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div>
+                <h2 className="text-base font-semibold text-foreground">
+                  Expanded output
+                </h2>
+                <p className="text-sm text-muted">
+                  Large JSON view for inspection and copy-paste during development.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void copyOutput()}
+                  className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:border-border-strong"
+                >
+                  {copyStatus === "copied"
+                    ? "Copied"
+                    : copyStatus === "failed"
+                      ? "Copy failed"
+                      : "Copy JSON"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsOutputExpanded(false)}
+                  className="rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-stone-50 transition hover:bg-stone-800"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 p-5">
+              <pre className="h-full overflow-auto rounded-lg bg-stone-950 px-4 py-4 font-mono text-[13px] leading-6 text-stone-100">
+                {outputJson}
+              </pre>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

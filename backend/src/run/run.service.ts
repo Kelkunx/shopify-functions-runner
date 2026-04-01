@@ -35,7 +35,9 @@ export class RunService {
       errors.push('The uploaded file must have a .wasm extension.');
     }
 
-    if (!SUPPORTED_FUNCTION_TYPES.includes(functionType as SupportedFunctionType)) {
+    if (
+      !SUPPORTED_FUNCTION_TYPES.includes(functionType as SupportedFunctionType)
+    ) {
       errors.push(
         `Unsupported function type "${functionType}". Supported types: ${SUPPORTED_FUNCTION_TYPES.join(', ')}.`,
       );

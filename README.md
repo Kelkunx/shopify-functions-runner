@@ -85,27 +85,30 @@ Requirements:
 - Node.js 20+
 - npm
 
-Install dependencies:
+Install everything from the monorepo root:
 
 ```bash
-cd backend && npm install
-cd ../frontend && npm install
+npm install
 ```
 
 ## Run Locally
 
-Start the backend on `http://localhost:3001`:
+Start frontend and backend together:
 
 ```bash
-cd backend
-npm run start:dev
+npm run dev
 ```
 
-Start the frontend on `http://localhost:3000`:
+This starts:
+
+- frontend on `http://localhost:3000`
+- backend on `http://localhost:3001`
+
+You can also run each app separately:
 
 ```bash
-cd frontend
-npm run dev
+npm run dev:frontend
+npm run dev:backend
 ```
 
 Open `http://localhost:3000` in the browser.
@@ -118,7 +121,33 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
 
 If not set, it defaults to `http://localhost:3001`.
 
+## Development Commands
+
+From the repository root:
+
+```bash
+npm run dev
+npm run dev:frontend
+npm run dev:backend
+npm run build
+npm run lint
+npm run test
+```
+
+More granular commands:
+
+```bash
+npm run build:frontend
+npm run build:backend
+npm run lint:frontend
+npm run lint:backend
+npm run test:backend
+npm run test:e2e
+```
+
 ## Verification
+
+Equivalent app-level commands still work inside `frontend/` and `backend/`, but the root scripts are intended to be the default entry point.
 
 Backend:
 
@@ -143,4 +172,3 @@ npm run lint
 - add Shopify Function input templates per function type
 - improve backend validation for malformed Shopify payloads
 - support loading and saving local test fixtures
-

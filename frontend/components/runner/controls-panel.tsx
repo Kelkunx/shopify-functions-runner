@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { functionTypes, type FunctionType } from "@/lib/function-templates";
 import type { RunnerMode, SavedFixture } from "@/lib/saved-fixtures";
 import { formatTimestamp } from "../runner-workspace.helpers";
@@ -5,6 +6,7 @@ import {
   EmptyState,
   Field,
   FixtureActionButton,
+  StateBadge,
   SecondaryButton,
   SelectInput,
   SidebarPanel,
@@ -20,9 +22,11 @@ export function RunnerControlsPanel({
   currentFunctionType,
   onDeleteSavedFixture,
   onExportNameChange,
+  onExportFixtures,
   onFixtureNameChange,
   onFixtureSave,
   onFunctionDirChange,
+  onImportFixtures,
   onFunctionTypeChange,
   onLoadFixture,
   onLoadSelectedTemplate,
@@ -34,6 +38,7 @@ export function RunnerControlsPanel({
   selectedTemplateId,
   target,
   templates,
+  transferFeedback,
   wasmFile,
 }: {
   currentExportName: string;
@@ -42,9 +47,11 @@ export function RunnerControlsPanel({
   currentFunctionType: FunctionType;
   onDeleteSavedFixture: (savedFixtureId: string) => void;
   onExportNameChange: (value: string) => void;
+  onExportFixtures: () => void;
   onFixtureNameChange: (value: string) => void;
   onFixtureSave: () => void;
   onFunctionDirChange: (value: string) => void;
+  onImportFixtures: (file: File | null) => void;
   onFunctionTypeChange: (value: FunctionType) => void;
   onLoadFixture: (savedFixture: SavedFixture) => void;
   onLoadSelectedTemplate: () => void;
@@ -56,6 +63,7 @@ export function RunnerControlsPanel({
   selectedTemplateId: string;
   target: string;
   templates: { id: string; label: string }[];
+  transferFeedback: string;
   wasmFile: File | null;
 }) {
   return (
@@ -153,10 +161,13 @@ export function RunnerControlsPanel({
       <SavedFixturesSection
         currentFixtureName={currentFixtureName}
         onDeleteSavedFixture={onDeleteSavedFixture}
+        onExportFixtures={onExportFixtures}
         onFixtureNameChange={onFixtureNameChange}
         onFixtureSave={onFixtureSave}
+        onImportFixtures={onImportFixtures}
         onLoadFixture={onLoadFixture}
         savedFixtures={savedFixtures}
+        transferFeedback={transferFeedback}
       />
     </SidebarPanel>
   );
@@ -165,22 +176,30 @@ export function RunnerControlsPanel({
 function SavedFixturesSection({
   currentFixtureName,
   onDeleteSavedFixture,
+  onExportFixtures,
   onFixtureNameChange,
   onFixtureSave,
+  onImportFixtures,
   onLoadFixture,
   savedFixtures,
+  transferFeedback,
 }: {
   currentFixtureName: string;
   onDeleteSavedFixture: (savedFixtureId: string) => void;
+  onExportFixtures: () => void;
   onFixtureNameChange: (value: string) => void;
   onFixtureSave: () => void;
+  onImportFixtures: (file: File | null) => void;
   onLoadFixture: (savedFixture: SavedFixture) => void;
   savedFixtures: SavedFixture[];
+  transferFeedback: string;
 }) {
+  const importInputReference = useRef<HTMLInputElement | null>(null);
+
   return (
     <SidebarSection title="Saved fixtures">
       <Field
-        helper="Saved locally in the browser for the current mode."
+        helper="Saved locally in the browser for the current mode. Export and import use JSON."
         label="Fixture name"
       >
         <div className="flex gap-2">
@@ -196,6 +215,32 @@ function SavedFixturesSection({
           </SecondaryButton>
         </div>
       </Field>
+
+      <div className="flex gap-2">
+        <SecondaryButton onClick={onExportFixtures} type="button">
+          Export
+        </SecondaryButton>
+        <SecondaryButton
+          onClick={() => importInputReference.current?.click()}
+          type="button"
+        >
+          Import
+        </SecondaryButton>
+        <input
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(event) => {
+            onImportFixtures(event.target.files?.[0] ?? null);
+            event.target.value = "";
+          }}
+          ref={importInputReference}
+          type="file"
+        />
+      </div>
+
+      {transferFeedback ? (
+        <StateBadge tone="neutral">{transferFeedback}</StateBadge>
+      ) : null}
 
       <div className="space-y-2">
         {savedFixtures.length === 0 ? (

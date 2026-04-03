@@ -20,7 +20,10 @@ export function RunnerWorkspace() {
     currentTarget,
     currentWasmFile,
     deleteSavedFixture,
+    exportVisibleFixtures,
+    fixturesTransferFeedback,
     formatCurrentInputJson,
+    importFixtureFile,
     isOutputModalOpen,
     isRunInFlight,
     jsonValidationError,
@@ -66,9 +69,11 @@ export function RunnerWorkspace() {
               currentFunctionType={currentFunctionType}
               onDeleteSavedFixture={deleteSavedFixture}
               onExportNameChange={setCurrentExportName}
+              onExportFixtures={exportVisibleFixtures}
               onFixtureNameChange={setCurrentFixtureName}
               onFixtureSave={saveCurrentFixture}
               onFunctionDirChange={setCurrentFunctionDir}
+              onImportFixtures={importFixtureFile}
               onFunctionTypeChange={updateFunctionType}
               onLoadFixture={loadSavedFixture}
               onLoadSelectedTemplate={loadSelectedTemplate}
@@ -80,6 +85,7 @@ export function RunnerWorkspace() {
               selectedTemplateId={selectedTemplateId}
               target={currentTarget}
               templates={availableTemplates}
+              transferFeedback={fixturesTransferFeedback}
               wasmFile={currentWasmFile}
             />
 

@@ -36,6 +36,9 @@ export function useRunnerWorkspaceController() {
 
   const {
     deleteSavedFixture: removeSavedFixture,
+    exportVisibleFixtures,
+    fixturesTransferFeedback,
+    importSavedFixturesFile,
     saveSavedFixture,
     visibleSavedFixtures,
   } = useSavedFixturesStore(activeRunnerMode);
@@ -117,6 +120,19 @@ export function useRunnerWorkspaceController() {
     removeSavedFixture(savedFixtureId);
   }
 
+  async function importFixtureFile(importFile: File | null) {
+    if (!importFile) {
+      return;
+    }
+
+    try {
+      await importSavedFixturesFile(importFile);
+      setRunRequestError("");
+    } catch {
+      setRunRequestError("Fixture import failed.");
+    }
+  }
+
   return {
     activeRunnerMode,
     availableTemplates,
@@ -129,7 +145,10 @@ export function useRunnerWorkspaceController() {
     currentTarget,
     currentWasmFile,
     deleteSavedFixture,
+    exportVisibleFixtures,
+    fixturesTransferFeedback,
     formatCurrentInputJson,
+    importFixtureFile,
     isOutputModalOpen,
     isRunInFlight,
     jsonValidationError,

@@ -2,6 +2,10 @@
 
 Open-source developer tool for testing Shopify Functions `.wasm` files locally without deploying to Shopify.
 
+## Screenshot
+
+![Shopify Functions Workbench interface](frontend/public/screenshot.png)
+
 The project is organized as a simple monorepo:
 
 - `frontend/`: Next.js UI with Monaco Editor and Tailwind CSS

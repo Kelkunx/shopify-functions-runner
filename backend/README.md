@@ -12,6 +12,7 @@ The backend exposes a local `POST /run` endpoint used by the frontend to:
 - optionally receive a local Shopify function directory and target
 - execute the function locally
 - return output, timing, and errors
+- return detailed local timing phases for debugging Shopify runner overhead
 
 The backend now supports two paths:
 
@@ -49,3 +50,16 @@ npm run test:e2e
 - `start:dev:light` keeps the same path with slightly quieter output for lighter local use
 - mock mode still supports requests without a real `.wasm` file to simplify local UI testing
 - real Shopify mode requires Shopify CLI plus a valid local function directory and target
+- real Shopify responses include local phase timings like parse, execution, `functionInfo`, and `functionRunner`
+- these timings reflect local machine overhead and are intended for local comparison, not as Shopify production guarantees
+- backend-only benchmark helper from the repo root:
+
+```bash
+npm run benchmark:shopify -- \
+  --function-dir /abs/path/to/function \
+  --target cart.lines.discounts.generate.run \
+  --input-file /abs/path/to/input.json \
+  --export-name run \
+  --warmup 1 \
+  --iterations 5
+```

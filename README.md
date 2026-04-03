@@ -84,7 +84,12 @@ Response:
   "success": true,
   "output": {},
   "executionTimeMs": 0.42,
-  "errors": []
+  "errors": [],
+  "timings": {
+    "parseMs": 0.02,
+    "executionMs": 0.4,
+    "totalMs": 0.42
+  }
 }
 ```
 
@@ -188,6 +193,7 @@ More granular commands:
 ```bash
 npm run build:frontend
 npm run build:backend
+npm run benchmark:shopify -- --help
 npm run lint:frontend
 npm run lint:backend
 npm run test:backend
@@ -227,3 +233,16 @@ npm run lint
 - `npm run dev` uses webpack on the frontend instead of Turbopack to avoid the process explosion seen in this environment
 - `npm run dev:light` disables frontend dev source maps and server fast refresh to reduce CPU and memory usage further
 - the backend dev server uses Nest watch mode with the `swc` builder, which is lighter than the default TypeScript watch path
+- real Shopify runs now return detailed local phase timings such as parse, execution, `functionInfo`, and `functionRunner`
+- those timings are useful for comparing local runs, but they are not Shopify production timings and should not be treated as acceptance thresholds
+- you can benchmark the backend without the browser using:
+
+```bash
+npm run benchmark:shopify -- \
+  --function-dir /abs/path/to/function \
+  --target cart.lines.discounts.generate.run \
+  --input-file /abs/path/to/input.json \
+  --export-name run \
+  --warmup 1 \
+  --iterations 5
+```

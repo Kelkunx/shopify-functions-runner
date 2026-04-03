@@ -15,6 +15,7 @@ The frontend provides the workbench UI to:
 - export and import fixtures as JSON
 - call the local backend runner
 - inspect output, errors, and execution time
+- inspect detailed local phase timings for Shopify runs
 
 ## Main Files
 
@@ -45,3 +46,4 @@ npm run lint
 - if `functionDir` and `target` are provided in the UI, the backend switches from mock mode to the real Shopify runner path
 - if no recognized function type is provided, mock mode falls back to `custom`
 - fixtures can be exported and imported as JSON; legacy storage from the old project name is migrated automatically
+- for Shopify runs, the UI shows a note that local timings are indicative only and may differ from Shopify production runtime performance

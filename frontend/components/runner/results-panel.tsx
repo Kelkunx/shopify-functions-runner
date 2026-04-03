@@ -107,8 +107,15 @@ export function RunResultsPanel({
           />
         </div>
         {runResponse?.timings.shopifyPhases ? (
-          <div className="mt-3 text-xs text-muted">
-            Cleanup: {formatDuration(runResponse.timings.shopifyPhases.cleanupMs)}
+          <div className="space-y-3">
+            <div className="text-xs text-muted">
+              Cleanup: {formatDuration(runResponse.timings.shopifyPhases.cleanupMs)}
+            </div>
+            <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
+              Local timings are indicative only. They include your local runner
+              environment and may differ from Shopify production runtime
+              performance.
+            </div>
           </div>
         ) : (
           <EmptyState>Detailed phase timings appear for Shopify runs.</EmptyState>

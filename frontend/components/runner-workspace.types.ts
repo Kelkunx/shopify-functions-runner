@@ -6,6 +6,18 @@ export interface RunResponse {
   output: Record<string, unknown>;
   executionTimeMs: number;
   errors: string[];
+  timings: {
+    executionMs: number;
+    parseMs: number;
+    totalMs: number;
+    shopifyPhases?: {
+      cleanupMs: number;
+      directoryCheckMs: number;
+      functionInfoMs: number;
+      functionRunnerMs: number;
+      wasmPreparationMs: number;
+    };
+  };
 }
 
 export interface RunnerFormState {

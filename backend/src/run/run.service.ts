@@ -7,6 +7,10 @@ import { MockFunctionRunnerService } from './mock-function-runner.service';
 import { RunRequestParserService } from './run-request-parser.service';
 import { ShopifyFunctionRunnerService } from './shopify-function-runner.service';
 import { type RunFunctionParams } from './types/run-function-params.type';
+import {
+  type RunTimings,
+  type ShopifyRunPhaseTimings,
+} from './types/run-response.type';
 import { type RunResponse } from './types/run-response.type';
 import { type UploadedWasmFile } from './types/uploaded-wasm-file.type';
 
@@ -15,8 +19,15 @@ interface TemporaryWasmArtifact {
   wasmPath: string;
 }
 
+interface ShopifyExecutionResult {
+  output: Record<string, unknown>;
+  shopifyPhases: ShopifyRunPhaseTimings;
+}
+
 @Injectable()
 export class RunService {
+  private readonly directoryCheckCache = new Map<string, Promise<void>>();
+
   constructor(
     private readonly mockFunctionRunner: MockFunctionRunnerService,
     private readonly runRequestParser: RunRequestParserService,
@@ -32,6 +43,7 @@ export class RunService {
     exportName,
   }: RunFunctionParams): Promise<RunResponse> {
     const startTime = process.hrtime.bigint();
+    const parseStartTime = process.hrtime.bigint();
     const { errors, parsedRequest } = this.runRequestParser.parse({
       exportName,
       functionDir,
@@ -40,33 +52,58 @@ export class RunService {
       target,
       wasmFile,
     });
+    const parseMs = this.measureElapsedMs(parseStartTime);
 
     if (errors.length > 0 || !parsedRequest) {
-      return this.buildResponse(false, {}, startTime, errors);
+      return this.buildResponse(false, {}, startTime, errors, {
+        executionMs: 0,
+        parseMs,
+        totalMs: this.measureElapsedMs(startTime),
+      });
     }
 
     try {
-      const output = parsedRequest.hasRealRunnerConfig
-        ? await this.executeShopifyRunner({
+      let output: Record<string, unknown>;
+      let shopifyPhases: ShopifyRunPhaseTimings | undefined;
+      const executionStartTime = process.hrtime.bigint();
+
+      if (parsedRequest.hasRealRunnerConfig) {
+        const shopifyResult = await this.executeShopifyRunner({
             exportName: parsedRequest.trimmedExportName,
             functionDir: parsedRequest.trimmedFunctionDir!,
             parsedInput: parsedRequest.parsedInput,
             target: parsedRequest.trimmedTarget!,
             wasmFile: parsedRequest.wasmFile,
-          })
-        : this.mockFunctionRunner.run({
+          });
+
+        output = shopifyResult.output;
+        shopifyPhases = shopifyResult.shopifyPhases;
+      } else {
+        output = this.mockFunctionRunner.run({
             functionType: parsedRequest.normalizedFunctionType,
             requestedFunctionType: parsedRequest.requestedFunctionType,
             parsedInput: parsedRequest.parsedInput,
             wasmFile: parsedRequest.wasmFile,
           });
+      }
 
-      return this.buildResponse(true, output, startTime, []);
+      const executionMs = this.measureElapsedMs(executionStartTime);
+
+      return this.buildResponse(true, output, startTime, [], {
+        executionMs,
+        parseMs,
+        shopifyPhases,
+        totalMs: this.measureElapsedMs(startTime),
+      });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unknown runner error.';
 
-      return this.buildResponse(false, {}, startTime, [message]);
+      return this.buildResponse(false, {}, startTime, [message], {
+        executionMs: this.measureElapsedMs(startTime) - parseMs,
+        parseMs,
+        totalMs: this.measureElapsedMs(startTime),
+      });
     }
   }
 
@@ -82,11 +119,15 @@ export class RunService {
     parsedInput: Record<string, unknown>;
     target: string;
     wasmFile?: UploadedWasmFile;
-  }): Promise<Record<string, unknown>> {
+  }): Promise<ShopifyExecutionResult> {
+    const directoryCheckStartTime = process.hrtime.bigint();
     await this.assertDirectoryExists(functionDir);
+    const directoryCheckMs = this.measureElapsedMs(directoryCheckStartTime);
 
+    const functionInfoStartTime = process.hrtime.bigint();
     const functionInfo =
       await this.shopifyFunctionRunner.getFunctionInfo(functionDir);
+    const functionInfoMs = this.measureElapsedMs(functionInfoStartTime);
     const targetConfig = functionInfo.targeting[target];
     const queryPath = targetConfig?.inputQueryPath;
 
@@ -97,10 +138,16 @@ export class RunService {
     }
 
     const exportToRun = this.resolveExportName(exportName, targetConfig?.export);
+    const wasmPreparationStartTime = process.hrtime.bigint();
     const temporaryWasmArtifact = await this.writeTemporaryWasmFile(wasmFile);
+    const wasmPreparationMs = this.measureElapsedMs(wasmPreparationStartTime);
     const wasmPath = temporaryWasmArtifact?.wasmPath ?? functionInfo.wasmPath;
+    let cleanupMs = 0;
+    let output: Record<string, unknown> = {};
+    let functionRunnerMs = 0;
 
     try {
+      const functionRunnerStartTime = process.hrtime.bigint();
       const result = await this.shopifyFunctionRunner.runFunction(
         {
           export: exportToRun,
@@ -113,22 +160,36 @@ export class RunService {
         queryPath,
         functionInfo.schemaPath,
       );
+      functionRunnerMs = this.measureElapsedMs(functionRunnerStartTime);
 
       if (result.error) {
         throw new Error(result.error);
       }
 
-      return result.result?.output ?? {};
+      output = result.result?.output ?? {};
     } finally {
       if (temporaryWasmArtifact) {
+        const cleanupStartTime = process.hrtime.bigint();
         await fs
           .rm(temporaryWasmArtifact.directoryPath, {
             force: true,
             recursive: true,
           })
           .catch(() => undefined);
+        cleanupMs = this.measureElapsedMs(cleanupStartTime);
       }
     }
+
+    return {
+      output,
+      shopifyPhases: {
+        cleanupMs,
+        directoryCheckMs,
+        functionInfoMs,
+        functionRunnerMs,
+        wasmPreparationMs,
+      },
+    };
   }
 
   private resolveExportName(
@@ -157,19 +218,65 @@ export class RunService {
     output: Record<string, unknown>,
     startTime: bigint,
     errors: string[],
+    timings: RunTimings,
   ): RunResponse {
-    const executionTimeMs =
-      Number(process.hrtime.bigint() - startTime) / 1_000_000;
+    const executionTimeMs = timings.totalMs;
 
     return {
       success,
       output,
       executionTimeMs: Number(executionTimeMs.toFixed(3)),
       errors,
+      timings: {
+        ...timings,
+        executionMs: Number(timings.executionMs.toFixed(3)),
+        parseMs: Number(timings.parseMs.toFixed(3)),
+        shopifyPhases: timings.shopifyPhases
+          ? {
+              cleanupMs: Number(timings.shopifyPhases.cleanupMs.toFixed(3)),
+              directoryCheckMs: Number(
+                timings.shopifyPhases.directoryCheckMs.toFixed(3),
+              ),
+              functionInfoMs: Number(
+                timings.shopifyPhases.functionInfoMs.toFixed(3),
+              ),
+              functionRunnerMs: Number(
+                timings.shopifyPhases.functionRunnerMs.toFixed(3),
+              ),
+              wasmPreparationMs: Number(
+                timings.shopifyPhases.wasmPreparationMs.toFixed(3),
+              ),
+            }
+          : undefined,
+        totalMs: Number(timings.totalMs.toFixed(3)),
+      },
     };
   }
 
+  private measureElapsedMs(startTime: bigint): number {
+    return Number(process.hrtime.bigint() - startTime) / 1_000_000;
+  }
+
   private async assertDirectoryExists(functionDir: string): Promise<void> {
+    const cachedDirectoryCheck = this.directoryCheckCache.get(functionDir);
+
+    if (cachedDirectoryCheck) {
+      return cachedDirectoryCheck;
+    }
+
+    const directoryCheckPromise = this.validateDirectory(functionDir).catch(
+      (error) => {
+        this.directoryCheckCache.delete(functionDir);
+        throw error;
+      },
+    );
+
+    this.directoryCheckCache.set(functionDir, directoryCheckPromise);
+
+    return directoryCheckPromise;
+  }
+
+  private async validateDirectory(functionDir: string): Promise<void> {
     let stat: Stats;
 
     try {

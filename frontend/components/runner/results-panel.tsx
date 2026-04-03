@@ -10,6 +10,14 @@ import {
   SmallActionButton,
 } from "./runner-ui-primitives";
 
+function formatDuration(durationMs: number | undefined) {
+  if (typeof durationMs !== "number") {
+    return "N/A";
+  }
+
+  return `${durationMs.toFixed(3)} ms`;
+}
+
 export function RunResultsPanel({
   copyFeedback,
   onCopyOutput,
@@ -51,6 +59,60 @@ export function RunResultsPanel({
           />
         </div>
         {runRequestError ? <DangerBox>{runRequestError}</DangerBox> : null}
+      </SidebarSection>
+
+      <SidebarSection title="Timings">
+        <div className="grid grid-cols-2 gap-3">
+          <Metric
+            label="Parse"
+            value={runResponse ? formatDuration(runResponse.timings.parseMs) : "Not run"}
+          />
+          <Metric
+            label="Execute"
+            value={
+              runResponse ? formatDuration(runResponse.timings.executionMs) : "Not run"
+            }
+          />
+          <Metric
+            label="Dir check"
+            value={
+              runResponse
+                ? formatDuration(runResponse.timings.shopifyPhases?.directoryCheckMs)
+                : "Not run"
+            }
+          />
+          <Metric
+            label="Function info"
+            value={
+              runResponse
+                ? formatDuration(runResponse.timings.shopifyPhases?.functionInfoMs)
+                : "Not run"
+            }
+          />
+          <Metric
+            label="Wasm prep"
+            value={
+              runResponse
+                ? formatDuration(runResponse.timings.shopifyPhases?.wasmPreparationMs)
+                : "Not run"
+            }
+          />
+          <Metric
+            label="Runner"
+            value={
+              runResponse
+                ? formatDuration(runResponse.timings.shopifyPhases?.functionRunnerMs)
+                : "Not run"
+            }
+          />
+        </div>
+        {runResponse?.timings.shopifyPhases ? (
+          <div className="mt-3 text-xs text-muted">
+            Cleanup: {formatDuration(runResponse.timings.shopifyPhases.cleanupMs)}
+          </div>
+        ) : (
+          <EmptyState>Detailed phase timings appear for Shopify runs.</EmptyState>
+        )}
       </SidebarSection>
 
       <SidebarSection title="Errors">

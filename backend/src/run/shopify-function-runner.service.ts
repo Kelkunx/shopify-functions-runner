@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 
 interface FixtureData {
@@ -167,7 +166,6 @@ export class ShopifyFunctionRunnerService {
 
   private async prepareRunnerSlot(): Promise<void> {
     await new Promise<void>((resolve) => setImmediate(resolve));
-    await delay(20);
   }
 
   private async runFunctionExclusively<T>(

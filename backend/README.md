@@ -26,7 +26,8 @@ In mock mode, `functionType` is assistive only and can fall back to `custom`.
 - `src/app.module.ts`: root application module
 - `src/run/run.module.ts`: run feature module
 - `src/run/run.controller.ts`: `POST /run` endpoint
-- `src/run/run.service.ts`: request validation, timing, mock execution, and real Shopify execution
+- `src/run/run.service.ts`: request orchestration, timing, and execution dispatch
+- `src/run/mock-function-runner.service.ts`: mock execution path for local DX
 - `src/run/shopify-function-runner.service.ts`: adapter around `@shopify/shopify-function-test-helpers`
 
 ## Scripts

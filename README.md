@@ -34,6 +34,7 @@ Implemented:
 - Monaco JSON editor
 - explicit mock vs Shopify runner modes
 - saved local fixtures in the browser
+- fixture import/export as JSON for the current runner mode
 - result, error, and execution time panels
 
 Current limitation:
@@ -162,6 +163,8 @@ Used when `functionDir` and `target` are provided.
 
 - the UI can save named fixtures to browser local storage
 - a fixture stores the current runner mode, function type, JSON input, and Shopify runner fields
+- fixtures can be exported as JSON and re-imported on another machine or browser
+- legacy fixture storage from the old project name is migrated automatically in the browser
 - fixtures are intended for fast local iteration, not source-controlled test cases
 
 ## Development Commands
@@ -217,7 +220,7 @@ npm run lint
 - make the real Shopify runner the primary path and reduce reliance on mock mode
 - add Shopify Function templates per target, not just per simplified function type
 - improve backend validation for malformed Shopify payloads
-- add import/export for fixtures so they can be shared across machines
+- add frontend tests for fixture workflows and runner state transitions
 
 ## Performance Notes
 
